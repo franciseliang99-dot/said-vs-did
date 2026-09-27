@@ -1,0 +1,9 @@
+{"event": "tv-001", "agent": "agent-a", "type": "will_do", "quote": "I'll do index.html.", "about": {"verb": "write", "target": "index.html"}}
+{"event": "tv-001", "agent": "agent-a", "type": "assign", "quote": "agent-b, please handle deployment.", "about": {"verb": "deploy", "target": null}, "assignee": "agent-b"}
+{"event": "tv-001", "agent": "agent-a", "type": "assign", "quote": "agent-c, please write the summary section in summary.md.", "about": {"verb": "write", "target": "summary.md"}, "assignee": "agent-c"}
+{"event": "tv-002", "agent": "agent-b", "type": "will_do", "quote": "I'll set up the deploy script first.", "about": {"verb": "write", "target": "deploy.sh"}}
+{"event": "tv-006", "agent": "agent-a", "type": "done", "quote": "I've written index.html with the page skeleton.", "about": {"verb": "write", "target": "index.html"}}
+{"event": "tv-009", "agent": "agent-c", "type": "done", "quote": "Updated style.css so the header matches the theme.", "about": {"verb": "edit", "target": "style.css"}}
+{"event": "tv-010", "agent": "agent-b", "type": "will_do", "quote": "I'll run the link checker next.", "about": {"verb": "run", "target": "link-check"}}
+{"event": "tv-016", "agent": "agent-b", "type": "done", "quote": "I've deployed the digest page to the site.", "about": {"verb": "deploy", "target": "site"}}
+{"event": "tv-019", "agent": "agent-c", "type": "doing", "quote": "Almost there, polishing the layout.", "about": {"verb": "edit", "target": null}}

@@ -1,0 +1,146 @@
+{
+  "schema": 2,
+  "entry_id": "entries/swarm-dynamics",
+  "signature_digest": "5b4f0ac6bcdc91a715bfc572f5c44a9c71c7d37a4ceaca03193bdf25568956a6",
+  "file_count": 16,
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "862263fa1f46c20f0d1e4dac5ffcc75abd55c08211b2c3864c5f8764b9d87793",
+      "rule": "exact-file",
+      "keys": [
+        ".gitignore"
+      ]
+    },
+    {
+      "path": "DESIGN.md",
+      "sha256": "b12a9133c634f29e6686f0bde35ddbd491da0351a2a48e74291cdd44f51bec87",
+      "rule": "exact-file",
+      "keys": [
+        "DESIGN.md"
+      ]
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "ac05a8ef5613075c84d14c437a539e8e0d32ce2215d8417bbbce5189b457790b",
+      "rule": "exact-file",
+      "keys": [
+        "LICENSE"
+      ]
+    },
+    {
+      "path": "README.md",
+      "sha256": "8770c4a348b23c4c9a53d0d38d7c4801970ad946769dd8e4f788e6e3d50d1d2b",
+      "rule": "exact-file",
+      "keys": [
+        "README.md"
+      ]
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "5e463b00ee0aa5d8642b91d2c8c8e8d20eddcf3ef8617b2e93a4fc2ea74c5514",
+      "rule": "exact-file",
+      "keys": [
+        "pyproject.toml"
+      ]
+    },
+    {
+      "path": "samples/EXPECTED.md",
+      "sha256": "183bcc9cac55473e1e31b8e87f9cfe9b7ca4dddcf393317c1e73c195c808796c",
+      "rule": "exact-file",
+      "keys": [
+        "samples/EXPECTED.md"
+      ]
+    },
+    {
+      "path": "samples/bad-findings.jsonl",
+      "sha256": "a1825c87f37f5a99d7d3d852f312af1d190b7ddb829450d88ff26618af8fbdb4",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
+      "path": "samples/claims.jsonl",
+      "sha256": "451a3bed9d133c034b03b8a7d82f2dd0f39545ca05331c04f64a4ec12aa8ec1a",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
+      "path": "samples/tiny-village.jsonl",
+      "sha256": "ceb4595ed98431c0cac1f2e4a347c883d2d4871c65a0fec922badf5693e95e85",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/__init__.py",
+      "sha256": "0f9cf702c6ec05b4ed6a445b61cb1f18efb106bcd1208d666d54132dbb0f3e80",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/__main__.py",
+      "sha256": "d6a3cb6087438165de0c6aa6978e0898d20489d08d9f6dce34fc545b0b19ef22",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/check.py",
+      "sha256": "2a94b61cbf62bf798a4ae62f8ec46568d161fc6a0745479bb52575bc2c5d9981",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/match.py",
+      "sha256": "c807fffc970cf84944bc2a9b64ad82459588afc7700cb9e237ae7865b4b8c24b",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/model.py",
+      "sha256": "c11e82eaa51040fb8bd2250f1a1f70824972a6dbd25ab52534e819314a30c130",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/rules.py",
+      "sha256": "98087466f07748c73acd46d1efbe35a9bc7ccb2c04cb5ed1ed119bf1bc39c0e8",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "tests/test_sample.py",
+      "sha256": "4940374ef18c9c1dfc56ec0e44225a9cf84cdf9657e7278d545c07b4fd9e5ca7",
+      "rule": "dir-code-ext",
+      "keys": [
+        "tests/",
+        ".py"
+      ]
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "schema": 2,
   "entry_id": "entries/swarm-dynamics",
-  "signature_digest": "5b4f0ac6bcdc91a715bfc572f5c44a9c71c7d37a4ceaca03193bdf25568956a6",
-  "file_count": 16,
+  "signature_digest": "59aded96f0b602614f7af72d2894a9127b89d16871795a28820939b069cb6335",
+  "file_count": 21,
   "files": [
     {
       "path": ".gitignore",
@@ -14,7 +14,7 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "b12a9133c634f29e6686f0bde35ddbd491da0351a2a48e74291cdd44f51bec87",
+      "sha256": "15d643241c15f540d3a58c3a9c661d891927bfed6dd6d7598a76310492aa8f92",
       "rule": "exact-file",
       "keys": [
         "DESIGN.md"
@@ -30,7 +30,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8770c4a348b23c4c9a53d0d38d7c4801970ad946769dd8e4f788e6e3d50d1d2b",
+      "sha256": "958e43a76d5a1945258ecb54fee30e51562eda47a3c7faaabe39c5e9735ffe35",
       "rule": "exact-file",
       "keys": [
         "README.md"
@@ -71,6 +71,24 @@
       ]
     },
     {
+      "path": "samples/probes/file-probe.jsonl",
+      "sha256": "b17e961a322e6df3ed5f2afc76f684f41ead2dd48d5714649d068354185487ff",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
+      "path": "samples/probes/work-noun-probe.jsonl",
+      "sha256": "aee44f5743b388a8c71eb52027422237c83592970bc503dd3cbe9699a1bfe8b7",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
       "path": "samples/tiny-village.jsonl",
       "sha256": "ceb4595ed98431c0cac1f2e4a347c883d2d4871c65a0fec922badf5693e95e85",
       "rule": "dir-code-ext",
@@ -90,7 +108,7 @@
     },
     {
       "path": "src/saidvsdid/__main__.py",
-      "sha256": "d6a3cb6087438165de0c6aa6978e0898d20489d08d9f6dce34fc545b0b19ef22",
+      "sha256": "2d8def63fadf0472d9522e35859315e252c2d68c96f3c9e5faf19bfc2abf9efe",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -100,6 +118,15 @@
     {
       "path": "src/saidvsdid/check.py",
       "sha256": "2a94b61cbf62bf798a4ae62f8ec46568d161fc6a0745479bb52575bc2c5d9981",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "src/saidvsdid/extract.py",
+      "sha256": "e8a91cd1e17953504b37216e83dc515a770035accd4dbc2cfd4ac8acaf1f1598",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -125,11 +152,29 @@
       ]
     },
     {
+      "path": "src/saidvsdid/prompt.py",
+      "sha256": "20bf1a1dc8cd4ff471aec3f418ffdfb882652dea3009036d5a902ec4f063247c",
+      "rule": "dir-code-ext",
+      "keys": [
+        "src/",
+        ".py"
+      ]
+    },
+    {
       "path": "src/saidvsdid/rules.py",
       "sha256": "98087466f07748c73acd46d1efbe35a9bc7ccb2c04cb5ed1ed119bf1bc39c0e8",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
+        ".py"
+      ]
+    },
+    {
+      "path": "tests/test_extract.py",
+      "sha256": "db451c76d54b032ddfb89614d4c1487a77e5e5b001382fc31a68016f55cc1abc",
+      "rule": "dir-code-ext",
+      "keys": [
+        "tests/",
         ".py"
       ]
     },

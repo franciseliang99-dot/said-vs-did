@@ -1,0 +1,5 @@
+{"id": "n-001", "t": "2026-09-27T11:00:00Z", "agent": "lead", "kind": "message", "text": "worker, please do the release tonight."}
+{"id": "n-002", "t": "2026-09-27T11:01:00Z", "agent": "lead", "kind": "message", "text": "worker, please take care of the migration."}
+{"id": "n-003", "t": "2026-09-27T11:02:00Z", "agent": "lead", "kind": "message", "text": "worker, please handle the cleanup."}
+{"id": "n-004", "t": "2026-09-27T11:03:00Z", "agent": "lead", "kind": "message", "text": "worker, please run the backup."}
+{"id": "n-999", "t": "2026-09-27T11:59:00Z", "agent": "worker", "kind": "message", "text": "Ok."}

@@ -1,8 +1,9 @@
 # Said vs Did — design sketch
 
-Status (2026-09-26): `match` and the checker are implemented and pass the answer key.
-Not built yet: `extract` (for now `samples/claims.jsonl` is written by hand in its
-place), the dataset adapter, and the interaction graph (question 1).
+Status (2026-09-27): `match` and the checker are implemented and pass the answer key.
+`extract` is implemented (model proposes, code validates; see below). The hand-written
+`samples/claims.jsonl` stays as the reference input. Not built yet: the dataset
+adapter and the interaction graph (question 1).
 
 ## What it does
 
@@ -80,6 +81,62 @@ The adapter for the organizers' dataset is written once its format is known.
 | `about` | `{verb, target}`: verb is one of `write` `edit` `run` `delete` `deploy`; target is what it acts on, or `null` if the message names none |
 | `assignee` | `assign` only |
 
+### How `extract` validates what the model proposes
+
+The model sees one message at a time and returns a JSON array of
+`{type, quote, verb, target, assignee}`. It never supplies `event` or `agent`; code
+fills those in. An item is refused, with its reason listed in the report, when:
+
+- it is not an object or lacks one of the five fields;
+- `type` is not one of the four claim types;
+- `quote` is empty or not a verbatim substring of the message;
+- `verb` is neither null nor one of the five verbs;
+- `target` is non-null but empty, or does not appear inside the quote (lowercased);
+  a target borrowed from another sentence of the same message is refused too;
+- `assignee` is set on a non-`assign` claim, or on an `assign` claim names an unknown
+  agent or the speaker.
+
+A reply that is not a JSON array (one surrounding code fence is tolerated) counts as a
+failed message, which is reported separately from a message with no claims.
+
+The target rule refuses two of the hand-written claims ("the deploy script" →
+`deploy.sh`, "the link checker" → `link-check`). Both are normalizations a reader makes;
+a model making them is guessing. The rule is kept strict, and those claims become "not
+checked". Neither is needed for the answer key.
+
+### Choosing the prompt
+
+The prompt in `src/saidvsdid/prompt.py` went through five versions (v0–v4). A second model
+reviewed each one and the next version answered its comments. Each version was also run
+on `llama3.1:8b` (temperature 0) against the sample and two small probes outside the answer
+key, both in `samples/probes/`: `file-probe.jsonl`, where the named file must be picked out
+of a sentence, and `work-noun-probe.jsonl`, where a request names only a kind of work
+("please do the release", "handle the cleanup").
+
+| version | sample: planted found | sample: false findings | file probe | work-noun probe: claims that became checkable |
+|---|---|---|---|---|
+| v0 | 3/3 | 0 (run twice) | 4/4 | 1 ("run the backup", a real target) |
+| v1 | 2/3 | — (messages failed to parse) | 4/4 | not run |
+| v2 | 3/3 | 1 | 4/4 | 2 |
+| v3 | 3/3 | 1 | 4/4 | 2 |
+| v4 | 3/3 | 0 | 4/4 | 3 (incl. "delete cleanup" from "handle the cleanup") |
+
+The false finding in v2 and v3 is the sample's trap: "please handle deployment" turned
+into a checkable `deploy` claim. v3 listed "deployment" as a word to leave null and the
+model extracted it anyway. v4 instead told the model not to derive a verb from a noun,
+and the model did it anyway on the probe. On a model this size, adding instructions did
+not change the behavior they described. v0 ships because no other version beat it on any run.
+
+Two review comments on v0 are still open:
+
+- Its null examples include a named thing after "the", so a model may leave out a real
+  resource such as "the site". That costs coverage (the claim becomes "not checked"),
+  not a false finding.
+- A message containing `"` or `\` needs escaping in the JSON reply, and the prompt says
+  nothing about it. v1 added an instruction for this and broke parsing on the sample,
+  so v0 relies on the model's default. A reply that does not parse is reported as a
+  failed message, never as "no claims".
+
 ## Finding
 
 | field | meaning |
@@ -140,6 +197,7 @@ finding reported, zero planted non-findings reported.
 - Whether the dataset's terms allow publishing derived excerpts in a public repo.
   Until known, the public repo only shows results on the hand-made sample.
 - Which model proposes claims, and what that costs. The checker does not care.
+  Local ollama and the Anthropic API are both wired in.
 - Exact target matching will miss real matches written differently (`./index.html`,
   a URL vs a path). Any loosening must show the pairing in the report and keep the
   deploy-script trap red.

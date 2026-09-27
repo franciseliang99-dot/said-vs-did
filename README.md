@@ -18,15 +18,22 @@ Python 3.11+, standard library only.
 
 ```
 PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --claims samples/claims.jsonl
+PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --extract ollama:llama3.1:8b
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
+
+`--extract BACKEND` has a model propose the claims instead of reading them from a file:
+`ollama:<model>` (local, `OLLAMA_HOST` or `localhost:11434`) or `anthropic[:<model>]`
+(needs `ANTHROPIC_API_KEY`). One call per message. `--save-claims <file>` writes the
+claims that survived validation, in the same format `--claims` reads.
 
 `--findings <file>` checks someone else's findings (for example, a model's) instead of
 proposing its own. `--json` prints machine-readable verdicts.
 
 Exit codes: `0` report written · `2` the input could not be trusted (bad JSON, duplicate
 ids, events out of order, no events) · `3` the matcher proposed a finding its own
-checker rejected, so the report is not trustworthy.
+checker rejected, so the report is not trustworthy · `4` (with `--extract`) at least one
+message got no usable model output, so claims from it are missing, not absent.
 
 ## What the checker enforces
 
@@ -52,9 +59,13 @@ findings and three planted true statements that must not be flagged.
 
 ## Limits, stated plainly
 
-- **Claims are hand-written for now.** `samples/claims.jsonl` stands in for the
-  extraction step, which will use a language model to propose claims. Whatever it
-  proposes still has to pass the checker.
+- **Extracted claims are validated, not trusted.** Code, not the model, decides which
+  event and agent a claim belongs to. A claim is refused, and listed with the reason,
+  if its quote is not verbatim, its type or verb is out of range, its assignee is
+  unknown or the speaker, or its target does not appear inside the quote. That last rule
+  is strict on purpose: a target the message never says is a guess, so "the deploy
+  script" cannot become `deploy.sh`. The cost is that such claims are not checked.
+  Whatever survives still has to pass the checker.
 - **The checker is not independent of the matcher.** They share one matching predicate,
   so the checker fully gates proposed findings but would not catch a bug in that
   predicate. The tests pin the predicate separately, including a mutation check for
@@ -62,6 +73,9 @@ findings and three planted true statements that must not be flagged.
 - **Target matching is exact** (case-insensitive, trailing `/` ignored). It will miss
   the same file written two ways. That is deliberate until a looser rule can show its
   pairings in the report.
+- **The prompt was picked by running it, not by reading it.** Later drafts that answered
+  review comments did worse on `llama3.1:8b`, so the first draft ships. Two review
+  comments on it are still open. Both are in DESIGN.md, "Choosing the prompt".
 - **Nothing has been run on real data yet.** Results here are on the hand-made sample only.
 
 Design notes: [DESIGN.md](DESIGN.md).

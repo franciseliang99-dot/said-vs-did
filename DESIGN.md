@@ -2,8 +2,8 @@
 
 Status (2026-09-27): `match` and the checker are implemented and pass the answer key.
 `extract` is implemented (model proposes, code validates; see below). The hand-written
-`samples/claims.jsonl` stays as the reference input. Not built yet: the dataset
-adapter and the interaction graph (question 1).
+`samples/claims.jsonl` stays as the reference input. The interaction graph (question 1)
+is implemented (2026-09-27; see "Interaction graph" below). Not built yet: the dataset adapter.
 
 ## What it does
 
@@ -69,6 +69,22 @@ Every data source gets one adapter: `iter_events(path) -> iterator of events`.
 
 The adapter for the organizers' dataset is written once its format is known.
 `samples/tiny-village.jsonl` is already in normalized form (identity adapter).
+
+## Interaction graph
+
+Built from messages only, deterministically, no model involved.
+
+- Edge `A → B` when a message by A lists B in `to`. The edge cites every such message id.
+  A name listed twice in one message counts once.
+- A message with an empty `to` is a **broadcast**. It is counted for its sender and never
+  spread into edges: who a broadcast was for is not in the data.
+- Actions and observations never make edges. Working on the same file is not addressing.
+- Each edge is labelled `mutual` (the reverse edge exists), `one-way`, or `self`.
+- Names that appear in `to` but never produce an event are listed as "addressed but never
+  appear". Agents with no addressed message in or out are listed too.
+
+It shows who talks to whom, not who listens: a reply is not linked to the message it
+answers unless the source says so.
 
 ## Claim (proposed by `extract`)
 

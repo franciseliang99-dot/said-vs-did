@@ -19,8 +19,14 @@ Python 3.11+, standard library only.
 ```
 PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --claims samples/claims.jsonl
 PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --extract ollama:llama3.1:8b
+PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --graph
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
+
+Every report starts with **who addresses whom**: a directed edge per sender and addressee,
+citing the messages it rests on. Messages with no addressee are counted as broadcasts, not
+guessed into edges. `--graph` prints only that part and needs no claims; add `--json` for
+the full edge list.
 
 `--extract BACKEND` has a model propose the claims instead of reading them from a file:
 `ollama:<model>` (local, `OLLAMA_HOST` or `localhost:11434`) or `anthropic[:<model>]`

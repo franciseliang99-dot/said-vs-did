@@ -237,6 +237,32 @@ Two review comments on v0 are still open:
   so v0 relies on the model's default. A reply that does not parse is reported as a
   failed message, never as "no claims".
 
+### Choosing the model
+
+v0 was then run on three local models (temperature 0, reasoning off). A third probe,
+`handover-probe.jsonl`, has three messages that hand work over ("here is chapter 12 for
+publication", "ready to ship") and two that report a real deploy.
+
+| model | sample: planted found | sample: false findings | file probe | work-noun probe | handover probe: handovers read as `deploy` | handover probe: real deploys found | seconds (sample ×2 + 2 probes) |
+|---|---|---|---|---|---|---|---|
+| `llama3.1:8b` | 3/3 | 0 (run twice) | 4/4 | 1 | 1/3 | 2/2 | 78 |
+| `qwen3.5` | 2/3 | 0 | 4/4 | 0 | not run | not run | 135 |
+| `gemma2:9b` | 3/3 | 0 (run twice) | 4/4 | 0 | 0/3 | 1/2 | 162 |
+
+No model wins everywhere. `llama3.1:8b` finds more real claims and also reads more
+handovers as finished work; `gemma2:9b` is more cautious and slower. `qwen3.5` misses a
+planted finding. The README keeps `llama3.1:8b` as the example.
+
+Both `llama3.1:8b` and `gemma2:9b` read "here is chapter 12 for publication" as
+`done write Chapter 12`. The chapter was written inside the message, so there is no
+write action to find, and the checker accepts the resulting `claimed_not_done`.
+Choosing another model does not fix this, so the rule layer does: a message that hands
+its content over for publication or review ("for publication", "ready to ship", "please
+publish", ...; `HANDOVER` in `rules.py`) is not decidable from the action log. The matcher
+lists such a `done` claim under **Not checked**, and the checker rejects a
+`claimed_not_done` that cites one (rule 4). A plain "I deployed it" with no action behind
+it is still reported.
+
 ## Finding
 
 | field | meaning |
@@ -260,6 +286,8 @@ Two review comments on v0 are still open:
    claim, **whatever window was declared** (a finding cannot shrink its window to hide the action that clears it).
    Any matching action rejects the finding, and so does any `command` or `gui` action
    by the agent in that search (see "Literal scripts": its effect is not fully recorded).
+   A cited message that hands its content over for publication or review (see
+   "Choosing the model") also rejects the finding: that is not an absence of action.
 5. `done_not_said`: cites an action by the flagged agent; the action must be
    destructive (its text says remove / delete / rm / drop / overwrite / wipe); the
    checker re-scans all of that agent's messages and rejects the finding if any
@@ -278,7 +306,8 @@ leading `./` and a trailing `/` (for a `command` action, against the paths it de
 writes; see "Literal scripts"). No fuzzy matching: creating `deploy.sh` is not deploying.
 
 Claims with no concrete target ("please handle deployment"), `will_do` and `doing`
-claims, assignments whose assignee took no later action, and absences that a script or
+claims, `done` claims read off a message that hands its content over for publication or
+review, assignments whose assignee took no later action, and absences that a script or
 a click in the window could hide are listed under **Not checked**, never turned into
 findings.
 
@@ -313,5 +342,11 @@ finding reported, zero planted non-findings reported.
   next to a script or a click is not decided at all (see "Literal scripts"). Any
   loosening must show the pairing in the report and keep the deploy-script trap red.
 - Deciding absence for agents that act through scripts would need their effects
-  recorded (files touched, commits made), not their text. The transcript does not carry
-  that.
+  recorded (files touched, commits made), not their text. The AI Village tables do not
+  carry that for the standard scaffolding: a bash turn keeps its stdout and stderr, and a
+  click keeps a screenshot. Output shows what a script printed, not everything it changed,
+  so it can support "done" but never "not done"; a screenshot would need a vision model
+  and still shows one screen, not the effect. The one table with structured tool calls
+  (file paths included) is the Claude Code stream, which covers a single agent over a
+  different period. So for now the two absence findings stay silent next to scripts and
+  clicks, by design.

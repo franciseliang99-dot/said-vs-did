@@ -146,6 +146,21 @@ class Prompt(unittest.TestCase):
         self.assertEqual(self.leaked(planted), ["i've deployed the digest page to the site"])
 
 
+class OllamaRequest(unittest.TestCase):
+    def test_reasoning_is_off_and_sampling_is_greedy(self):
+        # A model that reasons first (qwen3.5) spends the whole timeout before answering.
+        from saidvsdid import extract as ex
+        sent = []
+        orig = ex._post
+        ex._post = lambda url, body, headers, timeout: sent.append(body) or {"response": "[]"}
+        try:
+            self.assertEqual(ex.ollama("m")("p"), "[]")
+        finally:
+            ex._post = orig
+        self.assertIs(sent[0]["think"], False)
+        self.assertEqual(sent[0]["options"], {"temperature": 0})
+
+
 class Cli(unittest.TestCase):
     def run_cli(self, argv, backend):
         saved = cli.backend_from_spec

@@ -7,7 +7,7 @@ from datetime import timezone
 
 from .model import Cite, Claim, Event, Finding, Transcript
 from .rules import (DELETE_HINT, VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive,
-                    mentions, messages_by, names_path, opacity_note, unrecorded_effect)
+                    is_handover, mentions, messages_by, names_path, opacity_note, unrecorded_effect)
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,10 @@ def propose(tr: Transcript, claims: list[Claim]) -> tuple[list[Finding], list[Un
             # The checker judges the claim on the agent's own message naming the target (DESIGN rule 4).
             if src.kind != "message" or src.agent != c.agent or not mentions(src, c.target):
                 unchecked.append(Unchecked(c.event, "claim is not a message by the agent that names the target"))
+                continue
+            if is_handover(src):
+                unchecked.append(Unchecked(c.event, "the message hands its content over for someone else to "
+                                                    "publish or review; the action log cannot settle it"))
                 continue
             window = (tr.start, src.t)
             acts = actions_in(tr, c.agent, *window)

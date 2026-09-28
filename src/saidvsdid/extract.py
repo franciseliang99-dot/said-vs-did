@@ -134,7 +134,9 @@ def ollama(model: str, url: str | None = None, timeout: float = 120.0) -> Backen
     base = (url or os.environ.get("OLLAMA_HOST") or "http://localhost:11434").rstrip("/")
 
     def call(prompt: str) -> str:
-        r = _post(f"{base}/api/generate", {"model": model, "prompt": prompt, "stream": False,
+        # think=false: a model that reasons first (qwen3.5) otherwise spends the whole timeout
+        # before answering; models without that mode ignore it.
+        r = _post(f"{base}/api/generate", {"model": model, "prompt": prompt, "stream": False, "think": False,
                                             "options": {"temperature": 0}}, {}, timeout)
         return r.get("response", "")
     return call

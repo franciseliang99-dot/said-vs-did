@@ -9,8 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .model import FINDING_TYPES, Finding, Transcript, parse_time
-from .rules import (VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive, mentions, messages_by,
-                    names_path, opacity_note, unrecorded_effect)
+from .rules import (VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive, is_handover, mentions,
+                    messages_by, names_path, opacity_note, unrecorded_effect)
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,9 @@ def check(tr: Transcript, f: Finding) -> Verdict:
         claim = [e for e in cited if e.kind == "message" and e.agent == f.agent]
         if not any(mentions(m, f.about[1]) for m in claim):
             r.append(f"no cited message by {f.agent} mentions '{f.about[1]}'")
+        handed = [m.id for m in claim if is_handover(m)]
+        if handed:
+            r.append(f"{handed} hand(s) the content over for publication or review; not an absence of action")
         # Re-search at least the transcript start up to the claim, whatever window was declared:
         # a finding cannot shrink its own search space to hide the action that clears it.
         start = min(parse_time(f.window[0]), tr.start)

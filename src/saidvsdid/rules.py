@@ -543,3 +543,18 @@ def mentions(message: Event, target: str) -> bool:
 
 def messages_by(tr: Transcript, agent: str) -> list[Event]:
     return [e for e in tr.events if e.kind == "message" and e.agent == agent]
+
+
+# A message that hands its content over for someone else to publish, review or ship.
+# The work it talks about travels in the message itself (a chapter pasted in, a release
+# note to post), so the action log is the wrong place to look for it: a "done write" or
+# "done deploy" read off such a message is not decidable, in either direction.
+HANDOVER = re.compile(
+    r"\b(?:for (?:your )?(?:publication|review|approval)"
+    r"|ready (?:for|to) (?:publication|publish|review|release|ship|post)"
+    r"|please (?:publish|post|review|deploy|ship|release)"
+    r"|to be published)\b", re.I)
+
+
+def is_handover(message: Event) -> bool:
+    return message.kind == "message" and bool(HANDOVER.search(message.text))

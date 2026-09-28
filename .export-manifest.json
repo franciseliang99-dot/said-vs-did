@@ -2,7 +2,7 @@
   "schema": 2,
   "entry_id": "entries/swarm-dynamics",
   "signature_digest": "59aded96f0b602614f7af72d2894a9127b89d16871795a28820939b069cb6335",
-  "file_count": 26,
+  "file_count": 28,
   "files": [
     {
       "path": ".gitignore",
@@ -14,7 +14,7 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "e45c745590c3342cd38581d88cfe3634c9a866d01ccbb0f85d60382ac2e46c49",
+      "sha256": "77d25ca60ba5241d86dc9e878814a5726075d1dd54d1e7824567d6249ddebf49",
       "rule": "exact-file",
       "keys": [
         "DESIGN.md"
@@ -80,6 +80,15 @@
       ]
     },
     {
+      "path": "samples/probes/handover-probe.jsonl",
+      "sha256": "e55952f6db7c5150cfba9ed26bb71755b8469367414199606d91c883f2a872a8",
+      "rule": "dir-code-ext",
+      "keys": [
+        "samples/",
+        ".jsonl"
+      ]
+    },
+    {
       "path": "samples/probes/work-noun-probe.jsonl",
       "sha256": "aee44f5743b388a8c71eb52027422237c83592970bc503dd3cbe9699a1bfe8b7",
       "rule": "dir-code-ext",
@@ -117,7 +126,7 @@
     },
     {
       "path": "src/saidvsdid/check.py",
-      "sha256": "dbc590ed14d51148902a5b5ce626e3d2a30d2271e63cfbe8a989f7e5c9881a4d",
+      "sha256": "8af8fa667cfbc54db7bbbdf358bfc6e97db85e5a156da145961e6fb6491913db",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -126,7 +135,7 @@
     },
     {
       "path": "src/saidvsdid/extract.py",
-      "sha256": "e8a91cd1e17953504b37216e83dc515a770035accd4dbc2cfd4ac8acaf1f1598",
+      "sha256": "096098d8de753be540d6b5219859a58fb953bdc4677637405889cf7bace04a85",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -144,7 +153,7 @@
     },
     {
       "path": "src/saidvsdid/match.py",
-      "sha256": "b2ce9de041f0082c1a58a16c0f49d0249079a5eae20a18b4ef32da0226eb82ec",
+      "sha256": "d6d1b0da57bb787a65579b4e50e7aba0861dc6e09d7a20c6012a39c631301b1f",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -171,7 +180,7 @@
     },
     {
       "path": "src/saidvsdid/rules.py",
-      "sha256": "8c5173f1687d56c38e693a2d83ca6893f9e5f22b3c3cea9140850dff7f9de980",
+      "sha256": "63777c98c99666aeedb7460326087ee45b5d427262a5390c024c9467e911cada",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -189,7 +198,7 @@
     },
     {
       "path": "tests/test_extract.py",
-      "sha256": "db451c76d54b032ddfb89614d4c1487a77e5e5b001382fc31a68016f55cc1abc",
+      "sha256": "562448fa8ee4e4b9723b25c94ad3f373e9f11a856908b2d4a19c997aa8ec1d45",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",
@@ -199,6 +208,15 @@
     {
       "path": "tests/test_graph.py",
       "sha256": "ed887dd90bb01935e728d63745f84ac8ee9bc888aafe2665a4074419ca006721",
+      "rule": "dir-code-ext",
+      "keys": [
+        "tests/",
+        ".py"
+      ]
+    },
+    {
+      "path": "tests/test_handover.py",
+      "sha256": "afa034493815ac949c36c42ab4e4834bee5bc51c6350d21c27e3fd9123e1ecc1",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",

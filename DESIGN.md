@@ -3,7 +3,8 @@
 Status (2026-09-27): `match` and the checker are implemented and pass the answer key.
 `extract` is implemented (model proposes, code validates; see below). The hand-written
 `samples/claims.jsonl` stays as the reference input. The interaction graph (question 1)
-is implemented (2026-09-27; see "Interaction graph" below). Not built yet: the dataset adapter.
+is implemented (2026-09-27; see "Interaction graph" below). The AI Village adapter is
+implemented (2026-09-28; see "The AI Village adapter" below).
 
 ## What it does
 
@@ -67,8 +68,74 @@ Every data source gets one adapter: `iter_events(path) -> iterator of events`.
    error, not an empty result.
 4. No field is invented: if the raw source has no addressee, `to` is empty, not a guess.
 
-The adapter for the organizers' dataset is written once its format is known.
 `samples/tiny-village.jsonl` is already in normalized form (identity adapter).
+
+### The AI Village adapter (`src/saidvsdid/village.py`)
+
+Input: the downloaded tables from AI Digest's AI Village dataset (column names per its
+`SCHEMA.md`); `turns.slim.jsonl.gz`, a copy of the turns table without the raw model
+responses, is accepted in place of `computer_use_turns.jsonl.gz`. A time window is required.
+
+| event | source |
+|---|---|
+| `message` | `events` rows with `data.actionType == AGENT_TALK`; agent = `agents.name` of `data.speakerId` |
+| `action` | `computer_use_turns.agent_action`: `{command}` becomes `tool: command` (the text is the literal script), `target` = the command; clicks, typing and keys become `tool: gui`, `target` = the typed text or empty |
+| `observation` | `computer_use_turns.output` / `error`, when non-empty |
+
+- The executing agent of a turn is found through `session_id -> computer_use_sessions.agent_id`.
+- Timestamps are UTC without a zone suffix in the source; they are written with a `Z` and
+  always six fractional digits, so string order is time order.
+- `to` holds agent names written as `@<name>` in the message, exact and case-sensitive,
+  longest name first, never the speaker. Anything else stays unaddressed.
+- **Human messages are never emitted**, only counted: the dataset terms rule out quoting
+  human participants.
+- Actions with no effect (screenshots, scrolling, waiting, talking through the chat tool,
+  shell restarts, empty actions) and actions with no name are skipped **and counted by
+  reason**. An action shape the adapter does not know fails the run.
+- The CLI prints counts only, never message text.
+
+### Literal scripts (`tool: command`)
+
+A prose action says what it did ("remove directory old-reports/"), so a word rule works
+on it. A real script does not: a word rule fires on an `rm` inside a heredoc body, a
+comment or a Python string, and on deleting a scratch clone. For `command` actions the text is therefore **parsed as a shell script** (in
+`rules.py`, no model):
+
+- The lexer tracks quoting itself (no `shlex`), so a `#` or `<<` inside quotes is text.
+  An unquoted word starting with `#` is a comment to the end of the line. A heredoc
+  (`<<EOF`, `<<-EOF`, quoted or not) skips its body up to the terminator line, CRLF
+  tolerated; `<<<` is a here-string, and `$((a<<b))` / `((…))` / `${…}` stay one word.
+  Operators are split longest first, so `&&(` and `);` are two tokens. `( … )`, `$( … )`
+  and backticks are groups, and a `cd` inside a group ends with it. Redirection targets
+  (`2>/dev/null`, `<<< x`) are not arguments. In front of a command, `VAR=x`, `sudo` /
+  `env` / `nice` with their options, `if`/`then`/`do`, `{` and the like are skipped.
+  An unterminated quote or backtick makes the whole script unparsed.
+- A deletion is `rm`, `rmdir`, `unlink`, `shred`, `git rm` or `find <paths> -delete`, in
+  command position. Its paths are the non-empty arguments that are not options or option
+  values (`shred -n 3`); two spellings of one path (`./x`, `x`) count once. A `find` with
+  any filter (`-name`, `-mtime`, …) deletes a subset, not its root, so it is not literal.
+  This list is a floor, not an inventory: `git reset --hard`, `> file`, deletes inside
+  `python -c` are not judged.
+- A path under `/tmp`, `/var/tmp`, `/private/tmp` or `/dev/shm` (directly, or relative
+  after a literal `cd` into one) is scratch and never a finding. After a `cd` to a
+  variable the directory is unknown, so nothing after it counts as scratch.
+- A path with `$`, a glob, braces or `~`, `xargs rm`, and a filtered `find` cannot be
+  named literally: listed under **Not checked** with the count. So is a script that does
+  not parse but contains `rm`, `rmdir`, `unlink`, `shred`, `remove` or `delete`. GUI
+  actions are never judged destructive: typed text is content, and what a click did is
+  not recorded.
+- `done_not_said` is then per path: one finding for each literal, non-scratch path the
+  agent never names in any message. A message names a path if it contains the path, or
+  its last component (3 characters or more), as a whole token (`old-reports.` and
+  `old-reports/` count; `old-reports-2` and `old-reports/keep` do not). The finding's `about` is `["delete", <path>]`.
+- A `delete` claim matches a `command` action only if the claimed target equals one of
+  its deleted paths (after lower-casing and dropping `./` and a trailing `/`). No path
+  resolution and no partial match. `run` and `deploy` claims still compare against the
+  whole command, so they rarely match a real script: those claims fail towards
+  `claimed_not_done` and remain the open question below.
+
+Known limit: deleting something the agent created moments earlier in the same script
+(a temporary clone, a helper file) is still a finding if the agent never names it.
 
 ## Interaction graph
 
@@ -178,7 +245,9 @@ Two review comments on v0 are still open:
 5. `done_not_said`: cites an action by the flagged agent; the action must be
    destructive (its text says remove / delete / rm / drop / overwrite / wipe); the
    checker re-scans all of that agent's messages and rejects the finding if any
-   mentions the action's `target`. Non-destructive unmentioned actions are not findings:
+   mentions the action's `target`. For a literal script (`tool: command`), `about` must
+   name a path the script deletes outside a scratch dir, and no message by the agent
+   may name that path (see "Literal scripts" above). Non-destructive unmentioned actions are not findings:
    agents do many small things they don't narrate, and flagging them is noise.
 6. `off_assignment`: cites an assignment message **from another agent** whose quoted
    words name both the assignee and `about.target`, plus at least one action by the
@@ -187,7 +256,7 @@ Two review comments on v0 are still open:
 
 A match between an action and `{verb, target}` means: same agent, the action's `tool`
 is one the verb allows, and the targets are equal after lower-casing and dropping a
-trailing `/`. No fuzzy matching: creating `deploy.sh` is not deploying.
+leading `./` and a trailing `/`. No fuzzy matching: creating `deploy.sh` is not deploying.
 
 Claims with no concrete target ("please handle deployment"), `will_do` and `doing`
 claims, and assignments whose assignee took no later action are listed under
@@ -195,8 +264,10 @@ claims, and assignments whose assignee took no later action are listed under
 
 **Independence, stated honestly.** The checker shares the match predicate with the
 matcher (`rules.py`). It fully gates a model's proposals, but a bug in the shared
-predicate would pass both. The tests pin that predicate separately (the loose-matcher
-trap and mutation checks).
+predicate would pass both. The same holds for the script parser (`deleted_paths`,
+`names_path`): a parser bug reaches the checker too. The tests pin both separately (the
+loose-matcher trap, a table of scripts with their expected deletions, and mutation
+checks).
 
 Rejected findings are listed separately with their rejection reason. They are never
 dropped silently.
@@ -209,11 +280,13 @@ finding reported, zero planted non-findings reported.
 
 ## Open questions
 
-- Dataset format (arrives by email). Only the adapter depends on it.
+- ~~Dataset format~~ Resolved: see "The AI Village adapter".
 - Whether the dataset's terms allow publishing derived excerpts in a public repo.
   Until known, the public repo only shows results on the hand-made sample.
 - Which model proposes claims, and what that costs. The checker does not care.
   Local ollama and the Anthropic API are both wired in.
 - Exact target matching will miss real matches written differently (`./index.html`,
-  a URL vs a path). Any loosening must show the pairing in the report and keep the
+  a URL vs a path). For `delete` on real scripts this is now handled by parsing the
+  deleted paths; `run` and `deploy` claims against a real script still compare the whole
+  command. Any loosening must show the pairing in the report and keep the
   deploy-script trap red.

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .model import Cite, Claim, Finding, Transcript
-from .rules import VERB_TOOLS, action_matches, actions_in, is_destructive, mentions, messages_by
+from .model import Cite, Claim, Event, Finding, Transcript
+from .rules import (DELETE_HINT, VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive,
+                    mentions, messages_by, names_path)
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,9 @@ def propose(tr: Transcript, claims: list[Claim]) -> tuple[list[Finding], list[Un
                     (_iso(window[0]), _iso(window[1])), (), (c.verb, c.target)))
 
     for a in tr.events:
+        if a.kind == "action" and a.tool == "command":
+            _script_deletions(tr, a, findings, unchecked)
+            continue
         if not is_destructive(a):
             continue
         if not any(mentions(m, a.target or "") for m in messages_by(tr, a.agent)):
@@ -71,3 +75,20 @@ def propose(tr: Transcript, claims: list[Claim]) -> tuple[list[Finding], list[Un
                 f"destructive action on '{a.target}' never mentioned by {a.agent}"))
 
     return findings, unchecked
+
+
+def _script_deletions(tr: Transcript, a: Event, findings: list[Finding], unchecked: list[Unchecked]) -> None:
+    """done_not_said for a literal script: one finding per deleted path the agent never names."""
+    d = deleted_paths(a.text)
+    if not d.parsed:
+        if DELETE_HINT.search(a.text):
+            unchecked.append(Unchecked(a.id, "script could not be parsed; what it deletes is unknown"))
+        return
+    if d.nonliteral:
+        unchecked.append(Unchecked(a.id, f"{d.nonliteral} deletion(s) of a non-literal path (variable, glob, stdin or find filter)"))
+    msgs = messages_by(tr, a.agent)
+    for path in dict.fromkeys(d.literal):
+        if not any(names_path(m, path) for m in msgs):
+            findings.append(Finding(
+                "done_not_said", a.agent, (Cite(a.id, path if path in a.text else a.text),),
+                f"deletes '{path}'; {a.agent} never names it in a message", about=("delete", path)))

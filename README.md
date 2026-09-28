@@ -23,6 +23,14 @@ PYTHONPATH=src python3 -m saidvsdid samples/tiny-village.jsonl --graph
 PYTHONPATH=src python3 -m unittest discover -s tests
 ```
 
+On the AI Village dataset (downloaded separately; see DESIGN.md), convert a time window
+first, then run on the result:
+
+```
+PYTHONPATH=src python3 -m saidvsdid.village DATA_DIR --since 2026-09-17T00:00:00Z --until 2026-09-18T00:00:00Z -o day.jsonl
+PYTHONPATH=src python3 -m saidvsdid day.jsonl --graph
+```
+
 Every report starts with **who addresses whom**: a directed edge per sender and addressee,
 citing the messages it rests on. Messages with no addressee are counted as broadcasts, not
 guessed into edges. `--graph` prints only that part and needs no claims; add `--json` for

@@ -130,9 +130,26 @@ comment or a Python string, and on deleting a scratch clone. For `command` actio
   `old-reports/` count; `old-reports-2` and `old-reports/keep` do not). The finding's `about` is `["delete", <path>]`.
 - A `delete` claim matches a `command` action only if the claimed target equals one of
   its deleted paths (after lower-casing and dropping `./` and a trailing `/`). No path
-  resolution and no partial match. `run` and `deploy` claims still compare against the
-  whole command, so they rarely match a real script: those claims fail towards
-  `claimed_not_done` and remain the open question below.
+  resolution and no partial match.
+- A `write` or `edit` claim matches a `command` action the same way, against the paths
+  the script writes: redirect targets (`>`, `>>`, `>|`, `&>`, `&>>`; not `2>&1`, not
+  `/dev/…`), `tee` files, `sed -i` files (GNU options; `-i ''` as on macOS; without `-i`
+  sed writes nothing) and `cp` / `mv` / `install` destinations (a destination ending in
+  `/`, or given by `-t` / `--target-directory`, is a directory: each source lands in it
+  under its own name; `install -d` makes directories and writes no file). After a `cd`
+  only absolute paths count, since a relative one no longer says where it landed; `>`
+  inside `[[ ]]` is a comparison. Code run by an interpreter is not read. `run` and `deploy` claims compare against the
+  whole command.
+- **A script or a click can do more than its text shows.** `make`, `./deploy.sh`, Python
+  in a heredoc, a `git push` of a commit named only by its hash afterwards: none of these
+  say what they touched, and what a click did is not recorded at all. So an absence
+  (`claimed_not_done`, `off_assignment`) is decided only against actions whose record is
+  complete. If no action matches literally and the agent has any `command` or `gui`
+  action in the window, the claim is listed under **Not checked** ("N GUI or script
+  action(s) … may have done it without the record showing it"), never a finding. A
+  literal match still clears the claim. For agents that work only through scripts and
+  clicks this means those two finding types stay silent: the tool says it cannot tell,
+  rather than accuse.
 
 Known limit: deleting something the agent created moments earlier in the same script
 (a temporary clone, a helper file) is still a finding if the agent never names it.
@@ -239,9 +256,10 @@ Two review comments on v0 are still open:
 3. At least one cited event belongs to the flagged `agent`.
 4. `claimed_not_done`: `window`, `searched` and `about` are present. A cited message
    by the flagged agent must mention `about.target`. The checker re-runs the search
-   itself, from the start of the transcript to the claim, **whatever window was
-   declared** (a finding cannot shrink its window to hide the action that clears it).
-   Any matching action rejects the finding.
+   itself, from the start of the transcript to the later of the declared end and the
+   claim, **whatever window was declared** (a finding cannot shrink its window to hide the action that clears it).
+   Any matching action rejects the finding, and so does any `command` or `gui` action
+   by the agent in that search (see "Literal scripts": its effect is not fully recorded).
 5. `done_not_said`: cites an action by the flagged agent; the action must be
    destructive (its text says remove / delete / rm / drop / overwrite / wipe); the
    checker re-scans all of that agent's messages and rejects the finding if any
@@ -252,22 +270,27 @@ Two review comments on v0 are still open:
 6. `off_assignment`: cites an assignment message **from another agent** whose quoted
    words name both the assignee and `about.target`, plus at least one action by the
    assignee. The checker re-searches the assignee's actions after the assignment and
-   rejects the finding if any of them matches.
+   rejects the finding if any of them matches or is a `command` or `gui` action.
 
 A match between an action and `{verb, target}` means: same agent, the action's `tool`
 is one the verb allows, and the targets are equal after lower-casing and dropping a
-leading `./` and a trailing `/`. No fuzzy matching: creating `deploy.sh` is not deploying.
+leading `./` and a trailing `/` (for a `command` action, against the paths it deletes or
+writes; see "Literal scripts"). No fuzzy matching: creating `deploy.sh` is not deploying.
 
 Claims with no concrete target ("please handle deployment"), `will_do` and `doing`
-claims, and assignments whose assignee took no later action are listed under
-**Not checked**, never turned into findings.
+claims, assignments whose assignee took no later action, and absences that a script or
+a click in the window could hide are listed under **Not checked**, never turned into
+findings.
 
 **Independence, stated honestly.** The checker shares the match predicate with the
 matcher (`rules.py`). It fully gates a model's proposals, but a bug in the shared
 predicate would pass both. The same holds for the script parser (`deleted_paths`,
-`names_path`): a parser bug reaches the checker too. The tests pin both separately (the
-loose-matcher trap, a table of scripts with their expected deletions, and mutation
-checks).
+`written_paths`, `names_path`) and for the opacity rule (`unrecorded_effect`): a bug there
+reaches the checker too. The tests pin them separately (the loose-matcher trap, tables of
+scripts with their expected deletions and writes, scripts and clicks just outside the
+window, and mutation checks). The matcher also applies the checker's rules on the claim
+message and on who assigned the work, so a hand-written claims file cannot make them
+disagree.
 
 Rejected findings are listed separately with their rejection reason. They are never
 dropped silently.
@@ -286,7 +309,9 @@ finding reported, zero planted non-findings reported.
 - Which model proposes claims, and what that costs. The checker does not care.
   Local ollama and the Anthropic API are both wired in.
 - Exact target matching will miss real matches written differently (`./index.html`,
-  a URL vs a path). For `delete` on real scripts this is now handled by parsing the
-  deleted paths; `run` and `deploy` claims against a real script still compare the whole
-  command. Any loosening must show the pairing in the report and keep the
-  deploy-script trap red.
+  a URL vs a path). On scripts, `delete`, `write` and `edit` are parsed; an absence
+  next to a script or a click is not decided at all (see "Literal scripts"). Any
+  loosening must show the pairing in the report and keep the deploy-script trap red.
+- Deciding absence for agents that act through scripts would need their effects
+  recorded (files touched, commits made), not their text. The transcript does not carry
+  that.

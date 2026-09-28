@@ -14,7 +14,7 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "4fb3ba60aa18ef9c446062df2ae7bff907d62ee8ca8ee8fe0b21aec27b2350c8",
+      "sha256": "e45c745590c3342cd38581d88cfe3634c9a866d01ccbb0f85d60382ac2e46c49",
       "rule": "exact-file",
       "keys": [
         "DESIGN.md"
@@ -117,7 +117,7 @@
     },
     {
       "path": "src/saidvsdid/check.py",
-      "sha256": "19be73e483c34867a67128f5ddba8d3772b034b6d97853a6549577fe65debc00",
+      "sha256": "dbc590ed14d51148902a5b5ce626e3d2a30d2271e63cfbe8a989f7e5c9881a4d",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -144,7 +144,7 @@
     },
     {
       "path": "src/saidvsdid/match.py",
-      "sha256": "5d4b7785c1591e2a1a03725fa220f365bf874a0540da058894061c3a8c465c8c",
+      "sha256": "b2ce9de041f0082c1a58a16c0f49d0249079a5eae20a18b4ef32da0226eb82ec",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -171,7 +171,7 @@
     },
     {
       "path": "src/saidvsdid/rules.py",
-      "sha256": "ce5e2c0f5f0551f10911a92ca9911348f7a3252edfd1cab09625fe98c9c63943",
+      "sha256": "8c5173f1687d56c38e693a2d83ca6893f9e5f22b3c3cea9140850dff7f9de980",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -207,7 +207,7 @@
     },
     {
       "path": "tests/test_sample.py",
-      "sha256": "4940374ef18c9c1dfc56ec0e44225a9cf84cdf9657e7278d545c07b4fd9e5ca7",
+      "sha256": "fb8191d46e67191f2ea2cfc2a68c04ed486e4ffa7054ae9a9c2c3d6871e57082",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",
@@ -216,7 +216,7 @@
     },
     {
       "path": "tests/test_scripts.py",
-      "sha256": "ae3050379ff53afcb12027ee6ef7c4fc044b1679895c23529e5586cc5740eb3d",
+      "sha256": "65dddafc6efa0c727ec73cf4ceac9095399c1601c00ac9038ae2cab37c1419b2",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",

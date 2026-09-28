@@ -11,7 +11,7 @@ from pathlib import Path
 from saidvsdid.__main__ import main
 from saidvsdid.check import check
 from saidvsdid.match import propose
-from saidvsdid.model import load_claims, load_events, load_findings
+from saidvsdid.model import Claim, load_claims, load_events, load_findings
 
 SAMPLES = Path(__file__).resolve().parent.parent / "samples"
 EVENTS = SAMPLES / "tiny-village.jsonl"
@@ -68,6 +68,32 @@ class AnswerKey(unittest.TestCase):
         self.assertIn(("tv-001", "claim has no concrete verb + target; not decidable"),
                       {(u.event, u.reason) for u in self.unchecked})
         self.assertNotIn("agent-b", {f.agent for f in self.findings if f.type == "off_assignment"})
+
+    def test_assignment_quote_must_name_the_assignee(self):
+        # Real data, 2026-09-28: an extractor quoted only the part naming the target, and the
+        # checker rejected the finding. The matcher must not propose what the checker refuses.
+        claims = load_claims(SAMPLES / "claims.jsonl")
+        short = [replace(c, quote="write the summary section in summary.md")
+                 if c.type == "assign" and c.assignee == "agent-c" else c for c in claims]
+        findings, unchecked = propose(self.tr, short)
+        self.assertNotIn("off_assignment", {f.type for f in findings})
+        self.assertIn(("tv-001", "assignment quote does not name both the assignee and the target"),
+                      {(u.event, u.reason) for u in unchecked})
+        no_target = [replace(c, quote="agent-c, please write the summary section")
+                     if c.type == "assign" and c.assignee == "agent-c" else c for c in claims]
+        self.assertNotIn("off_assignment", {f.type for f in propose(self.tr, no_target)[0]})
+
+
+    def test_claims_the_checker_would_refuse_are_listed_not_proposed(self):
+        # Hand-written claims skip the extractor's validation; the matcher must still not
+        # propose what the checker rejects (DESIGN rules 4 and 6).
+        self_assign = Claim("tv-016", "agent-b", "assign", "I'll deploy", "deploy", "site", "agent-b")
+        no_target = Claim("tv-016", "agent-b", "done", "x", "deploy", "database")
+        findings, unchecked = propose(self.tr, [self_assign, no_target])
+        self.assertEqual([f.type for f in findings], ["done_not_said"])  # tv-013, from the events alone
+        self.assertEqual([u.reason for u in unchecked], [
+            "an agent assigning work to itself is not an assignment",
+            "claim is not a message by the agent that names the target"])
 
 
 class ControlArm(unittest.TestCase):
@@ -139,6 +165,22 @@ class Cli(unittest.TestCase):
             rc, _, err = run(self._tmp(text), "--claims", SAMPLES / "claims.jsonl")
             self.assertEqual(rc, 2, name)
             self.assertIn("input error", err, name)
+
+    def test_offset_timestamps_agree_with_the_checker(self):
+        # A window written as local time with a Z suffix moved the checker's search hours
+        # past the claim, onto a later script: matcher and checker disagreed (exit 3).
+        ev = lambda i, t, kind, text, tool=None: json.dumps(dict(
+            {"id": i, "t": t, "agent": "a", "kind": kind, "text": text},
+            **({"tool": tool, "target": text} if tool else {})))
+        events = self._tmp("\n".join([
+            ev("e0", "2026-10-03T10:00:00+02:00", "action", "other.txt", "file_write"),
+            ev("e1", "2026-10-03T10:00:05+02:00", "message", "Deployed the banner."),
+            ev("e2", "2026-10-03T10:30:00+02:00", "action", "ls", "command")]) + "\n")
+        claims = self._tmp(json.dumps({"event": "e1", "agent": "a", "type": "done", "quote": "Deployed the banner",
+                                       "about": {"verb": "deploy", "target": "banner"}}) + "\n")
+        rc, out, _ = run(events, "--claims", claims, "--json")
+        self.assertEqual(rc, 0)
+        self.assertEqual(json.loads(out)[0]["finding"]["window"], ["2026-10-03T08:00:00Z", "2026-10-03T08:00:05Z"])
 
     def test_matcher_checker_disagreement_exit_3(self):
         import saidvsdid.__main__ as cli

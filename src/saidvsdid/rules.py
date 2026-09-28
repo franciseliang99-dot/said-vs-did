@@ -14,8 +14,8 @@ from .model import Event, Transcript
 # `command` is an action whose text is the literal shell script that ran (from a dataset
 # adapter); `shell` is an action described in prose with its target already named.
 VERB_TOOLS: dict[str, frozenset[str]] = {
-    "write": frozenset({"file_write"}),
-    "edit": frozenset({"file_write"}),
+    "write": frozenset({"file_write", "command"}),
+    "edit": frozenset({"file_write", "command"}),
     "run": frozenset({"shell", "command"}),
     "delete": frozenset({"shell", "file_delete", "command"}),
     "deploy": frozenset({"deploy", "shell", "command"}),
@@ -37,12 +37,15 @@ def action_matches(action: Event, agent: str, verb: str, target: str) -> bool:
     """Exact target equality. Deliberately no fuzzy matching: a deploy *script* is not a deploy.
 
     For a `command` action and the verb `delete`, the targets are the literal paths its
-    deletion commands name (see deleted_paths); each must still equal the claimed target."""
+    deletion commands name (see deleted_paths); for `write` and `edit`, the literal paths it
+    writes (see written_paths). Each must still equal the claimed target."""
     if not (action.kind == "action" and action.agent == agent
             and action.tool in VERB_TOOLS.get(verb, frozenset())):
         return False
     if action.tool == "command" and verb == "delete":
         return norm_target(target) in {norm_target(p) for p in deleted_paths(action.text).literal}
+    if action.tool == "command" and verb in ("write", "edit"):
+        return norm_target(target) in {norm_target(p) for p in written_paths(action.text).literal}
     return norm_target(action.target or "") == norm_target(target)
 
 
@@ -330,6 +333,182 @@ def deleted_paths(script: str) -> Deletions:
         elif val == ")" and stack:
             cwd = stack.pop()
     return Deletions(True, tuple(literal.values()), tuple(scratch.values()), nonliteral)
+
+
+# --- what a literal script writes ------------------------------------------------------
+
+# Redirects that write the file named by the next word. `>&` and `<>` are left out: `2>&1`
+# duplicates a descriptor, and `<>` opens for reading too.
+_WRITE_REDIRECTS = frozenset({">", ">>", ">|", "&>", "&>>"})
+# Options of cp / mv / install that take a value (not a path): short letters, and long
+# options given the value as the next word.
+_COPY_SHORT_ARGS = "tSmog"
+_COPY_LONG_ARGS = frozenset({"--target-directory", "--suffix", "--mode", "--owner", "--group"})
+
+
+@dataclass(frozen=True)
+class Writes:
+    parsed: bool                        # False: the script could not be tokenized; nothing is known
+    literal: tuple[str, ...] = ()       # paths written, as written
+
+
+def _sed_in_place_files(args: list[str]) -> list[str]:
+    """Files `sed` edits in place (GNU semantics; `-i ''` as on macOS). [] without -i."""
+    in_place, script_given, operands = False, False, []
+    opts_done, k = False, 0
+    while k < len(args):
+        a = args[k]
+        k += 1
+        if not opts_done and a == "--":
+            opts_done = True
+        elif not opts_done and a.startswith("--"):
+            if a == "--in-place" or a.startswith("--in-place="):
+                in_place = True
+            elif a in ("--expression", "--file"):
+                script_given, k = True, k + 1
+            elif a == "--line-length":
+                k += 1
+            elif a.startswith(("--expression=", "--file=")):
+                script_given = True
+        elif not opts_done and a.startswith("-") and a != "-":
+            m = re.fullmatch(r"-([nrEsuz]*)(i.*)?", a)
+            if m and m.group(2) is not None:
+                in_place = True
+                if a == "-i" and k < len(args) and args[k] == "":
+                    k += 1  # -i '' : empty backup suffix
+            elif a in ("-e", "-f"):
+                script_given, k = True, k + 1
+            elif a == "-l":
+                k += 1  # -l N: line length
+            elif re.fullmatch(r"-[nrEsuz]*[ef].*", a):
+                script_given = True  # -ne 's/x/y/' style cluster: the script is attached or next
+                if re.fullmatch(r"-[nrEsuz]*[ef]", a):
+                    k += 1
+        else:
+            operands.append(a)
+    if not in_place:
+        return []
+    return operands if script_given else operands[1:]
+
+
+def _copy_destinations(cmd: str, args: list[str]) -> list[str]:
+    """Paths cp / mv / install write. A destination ending in "/" (or given by -t) is a
+    directory: each source lands in it under its own name. `install -d` only makes
+    directories, so it writes no file."""
+    target_dir, operands = None, []
+    opts_done, k = False, 0
+    while k < len(args):
+        a = args[k]
+        k += 1
+        if not opts_done and a == "--":
+            opts_done = True
+        elif not opts_done and a.startswith("--"):
+            name, eq, value = a.partition("=")
+            if name in _COPY_LONG_ARGS and not eq:
+                value, k = (args[k] if k < len(args) else ""), k + 1
+            if name == "--target-directory":
+                target_dir = value
+            elif cmd == "install" and name == "--directory":
+                return []
+        elif not opts_done and a.startswith("-") and a != "-":
+            for i, ch in enumerate(a[1:], 1):
+                if cmd == "install" and ch == "d":
+                    return []
+                if ch in _COPY_SHORT_ARGS:  # -rt DIR, -tDIR, -m 755: the rest is its value
+                    value = a[i + 1:]
+                    if not value:
+                        value, k = (args[k] if k < len(args) else ""), k + 1
+                    if ch == "t":
+                        target_dir = value
+                    break
+        else:
+            operands.append(a)
+    sources = operands
+    if target_dir is None:
+        if len(operands) < 2:
+            return []
+        target_dir, sources = operands[-1], operands[:-1]
+        if not target_dir.endswith("/"):
+            return [target_dir]
+    return [target_dir] + [posixpath.join(target_dir, posixpath.basename(src.rstrip("/"))) for src in sources]
+
+
+def written_paths(script: str) -> Writes:
+    """What a literal shell script writes: redirect targets (`>`, `>>`, `&>` ...), `tee` files,
+    `sed -i` files and cp / mv / install destinations. Only literal paths count; heredoc
+    bodies, comments and quoted strings are never read as commands. After a `cd` a relative
+    path no longer says where it lands, so only absolute ones count; `>` inside `[[ ]]` is a
+    comparison, not a redirect. Code run by an
+    interpreter (python3 -c, heredocs fed to python) is not read: what it writes is unknown."""
+    try:
+        toks = _lex(script)
+    except _Unparsed:
+        return Writes(parsed=False)
+    out: dict[str, str] = {}
+    moved = False  # a cd has run: relative paths are relative to somewhere unknown
+
+    def add(path: str) -> None:
+        if moved and not path.startswith("/"):
+            return
+        if path and path != "-" and not path.startswith("/dev/") and not _NONLITERAL.search(path):
+            out.setdefault(norm_target(path), path)
+
+    def run(words: list[str]) -> None:
+        nonlocal moved
+        words = _strip_prefixes(words)
+        if not words:
+            return
+        cmd, args = posixpath.basename(words[0]), words[1:]
+        if cmd in ("cd", "pushd", "popd"):
+            moved = True
+        elif cmd == "tee":
+            for a in args:
+                if not a.startswith("-"):
+                    add(a)
+        elif cmd == "sed":
+            for a in _sed_in_place_files(args):
+                add(a)
+        elif cmd in ("cp", "mv", "install"):
+            for a in _copy_destinations(cmd, args):
+                add(a)
+
+    words: list[str] = []
+    pending: str | None = None  # a redirect waiting for its target word
+    in_test = False             # inside [[ ]], where > and < compare strings
+    for kind, val in toks + [("op", "\n")]:
+        if pending is not None:
+            op, pending = pending, None
+            if kind == "w":
+                if op in _WRITE_REDIRECTS:
+                    add(val)
+                continue
+        if kind == "w":
+            if val == "[[" and not words:
+                in_test = True
+            elif val == "]]":
+                in_test = False
+            words.append(val)
+        elif in_test and val in _REDIRECTS:
+            continue
+        elif val in _REDIRECTS:
+            pending = val
+        else:
+            run(words)
+            words = []
+    return Writes(True, tuple(out.values()))
+
+
+def unrecorded_effect(action: Event) -> bool:
+    """The record cannot show everything this action did: a GUI action (what a click does is
+    not recorded) or a script (`make`, `./deploy.sh`, python in a heredoc, a push whose object
+    is named only after it exists). An absence finding (claimed_not_done, off_assignment) is
+    withheld while one of these is in its window; a literal match still clears the claim."""
+    return action.kind == "action" and action.tool in ("gui", "command")
+
+
+def opacity_note(ids: list[str]) -> str:
+    shown = ", ".join(ids[:3]) + (f" and {len(ids) - 3} more" if len(ids) > 3 else "")
+    return f"{len(ids)} GUI or script action(s) ({shown}) may have done it without the record showing it"
 
 
 def names_path(message: Event, path: str) -> bool:

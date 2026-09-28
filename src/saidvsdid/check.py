@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from .model import FINDING_TYPES, Finding, Transcript, parse_time
 from .rules import (VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive, mentions, messages_by,
-                    names_path)
+                    names_path, opacity_note, unrecorded_effect)
 
 
 @dataclass(frozen=True)
@@ -53,9 +53,14 @@ def check(tr: Transcript, f: Finding) -> Verdict:
         # a finding cannot shrink its own search space to hide the action that clears it.
         start = min(parse_time(f.window[0]), tr.start)
         end = max([parse_time(f.window[1])] + [m.t for m in claim])
-        hits = [a.id for a in actions_in(tr, f.agent, start, end) if action_matches(a, f.agent, *f.about)]
+        acts = actions_in(tr, f.agent, start, end)
+        hits = [a.id for a in acts if action_matches(a, f.agent, *f.about)]
         if hits:
             r.append(f"re-check found matching action(s) {hits}")
+        # A click or a script may have done it without the record showing it.
+        opaque = [a.id for a in acts if unrecorded_effect(a)]
+        if opaque:
+            r.append(f"{opacity_note(opaque)}; the absence cannot be established")
 
     elif f.type == "done_not_said":
         acts = [e for e in cited if e.kind == "action" and e.agent == f.agent]
@@ -95,8 +100,12 @@ def check(tr: Transcript, f: Finding) -> Verdict:
             if not any(f.agent.lower() in x and f.about[1].lower() in x for x in q):
                 r.append(f"no cited assignment quote names both {f.agent} and '{f.about[1]}'")
             first = min(tr.by_id[c.event].t for c in assigns)
-            hits = [a.id for a in actions_in(tr, f.agent, first, tr.end) if action_matches(a, f.agent, *f.about)]
+            later = actions_in(tr, f.agent, first, tr.end)
+            hits = [a.id for a in later if action_matches(a, f.agent, *f.about)]
             if hits:
                 r.append(f"re-check found on-assignment action(s) {hits}")
+            opaque = [a.id for a in later if unrecorded_effect(a)]
+            if opaque:
+                r.append(f"{opacity_note(opaque)}; the absence cannot be established")
 
     return Verdict(f, not r, tuple(r))

@@ -186,7 +186,8 @@ class Refusals(unittest.TestCase):
     def test_unparseable_line_fails_and_writes_nothing(self):
         rc, _, err, out = self.cli(make_dataset(bad_event_line="{not json"))
         self.assertEqual(rc, 2)
-        self.assertIn("events.jsonl.gz line 7: not JSON", err)
+        # The bad line is written after every good row, so its number is len(EVENTS) + 1.
+        self.assertIn(f"events.jsonl.gz line {len(EVENTS) + 1}: not JSON", err)
         self.assertFalse(out.exists())
 
     def test_empty_window_is_an_error(self):

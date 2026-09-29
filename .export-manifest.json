@@ -1,8 +1,8 @@
 {
   "schema": 2,
   "entry_id": "entries/swarm-dynamics",
-  "signature_digest": "59aded96f0b602614f7af72d2894a9127b89d16871795a28820939b069cb6335",
-  "file_count": 28,
+  "signature_digest": "9464cb3748e6bad7a5d3ec8b5e4f3b60f634bc854f76bcb61ec22aad082be11e",
+  "file_count": 29,
   "files": [
     {
       "path": ".gitignore",
@@ -30,10 +30,18 @@
     },
     {
       "path": "README.md",
-      "sha256": "4eb6e99746ddb3fa2175d7888099c5db62bf0c136037d8772b6449168f22bdcb",
+      "sha256": "348739b3e4d170df2a80a11d2441e442f8747c6ba87e362acd6fbca7a059f71b",
       "rule": "exact-file",
       "keys": [
         "README.md"
+      ]
+    },
+    {
+      "path": "WRITEUP.md",
+      "sha256": "ce429ff07711de0648e6c09dbce476982fac50ba7e3cafaf21c388fbfd659926",
+      "rule": "exact-file",
+      "keys": [
+        "WRITEUP.md"
       ]
     },
     {
@@ -243,7 +251,7 @@
     },
     {
       "path": "tests/test_village.py",
-      "sha256": "1aadf524bdd35ee44870fa936b4f020e09dca0a257241b018a9c4ff132f494fd",
+      "sha256": "6c5b40c3dfa288b3f8deb6b34b9923e01bbe123477b6b12bd1f7d56adea98d97",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",

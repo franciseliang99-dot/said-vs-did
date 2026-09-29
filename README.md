@@ -90,7 +90,9 @@ findings and three planted true statements that must not be flagged.
 - **The prompt was picked by running it, not by reading it.** Later drafts that answered
   review comments did worse on `llama3.1:8b`, so the first draft ships. Two review
   comments on it are still open. Both are in DESIGN.md, "Choosing the prompt".
-- **Nothing has been run on real data yet.** Results here are on the hand-made sample only.
+- **No dataset content is in this repository.** The adapter runs on the AI Village
+  dataset, but the dataset is access-reviewed, so every result shown here is on the
+  hand-made sample. Real-data results are summarised as counts in WRITEUP.md.
 
 Design notes: [DESIGN.md](DESIGN.md).
 

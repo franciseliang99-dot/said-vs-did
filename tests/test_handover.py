@@ -24,6 +24,7 @@ class Handover(unittest.TestCase):
             claim("h-001", "writer", "write", "Chapter 12", "Here is Chapter 12 of the guide for publication."),
             claim("h-002", "writer", "write", "Chapter 13", "Chapter 13, \"The Long Road\", is ready for publication."),
             claim("h-003", "writer", "deploy", "release note", "Here is the release note for v2.4, ready to ship"),
+            claim("h-006", "writer", "write", "Chapter 14", "Here is Chapter 14 of the guide"),
         ]
         # Plain "I did it" statements with no action behind them: these must still be reported.
         cls.said = [
@@ -35,7 +36,7 @@ class Handover(unittest.TestCase):
         findings, unchecked = propose(self.tr, self.handed)
         self.assertEqual(findings, [])
         self.assertEqual({u.event for u in unchecked if "hands its content over" in u.reason},
-                         {"h-001", "h-002", "h-003"})
+                         {"h-001", "h-002", "h-003", "h-006"})
 
     def test_plain_done_claims_are_still_reported_and_accepted(self):
         findings, _ = propose(self.tr, self.said)
@@ -69,12 +70,16 @@ class Criterion(unittest.TestCase):
     def test_handover_phrases(self):
         for text in ("Here is Chapter 12 for publication.", "Chapter 13 is ready for publication.",
                      "Release note, ready to ship.", "Please publish chapter 4.", "Draft for your review.",
-                     "This one is to be published tomorrow.", "PLEASE DEPLOY the fix."):
+                     "This one is to be published tomorrow.", "PLEASE DEPLOY the fix.",
+                     'Here is Chapter 623 of "Echoes", titled "The First Word".', "Here's part 3.",
+                     "here\u2019s Episode 12, as promised."):
             self.assertTrue(is_handover(self.msg(text)), text)
 
     def test_done_statements_are_not_handovers(self):
         for text in ("I published Chapter 11.", "I deployed the release note.", "Reviewed and merged the PR.",
-                     "The chapter is ready.", "Publication went out at noon.", "I shipped it for real."):
+                     "The chapter is ready.", "Publication went out at noon.", "I shipped it for real.",
+                     "Here is the release I deployed.", "Here is the chapter I published.",
+                     "Chapter 12 is here.", "Here is chapter twelve's deploy log."):
             self.assertFalse(is_handover(self.msg(text)), text)
 
     def test_only_messages(self):

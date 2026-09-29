@@ -258,7 +258,9 @@ Both `llama3.1:8b` and `gemma2:9b` read "here is chapter 12 for publication" as
 write action to find, and the checker accepts the resulting `claimed_not_done`.
 Choosing another model does not fix this, so the rule layer does: a message that hands
 its content over for publication or review ("for publication", "ready to ship", "please
-publish", ...; `HANDOVER` in `rules.py`) is not decidable from the action log. The matcher
+publish", or a bare "here is Chapter 12" whose numbered part is the message body;
+`HANDOVER` in `rules.py`) is not decidable from the action log. A bare "here is ..." is
+not enough: "here is the release I deployed" is a real claim. The matcher
 lists such a `done` claim under **Not checked**, and the checker rejects a
 `claimed_not_done` that cites one (rule 4). A plain "I deployed it" with no action behind
 it is still reported.

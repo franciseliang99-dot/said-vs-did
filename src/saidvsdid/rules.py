@@ -553,7 +553,11 @@ HANDOVER = re.compile(
     r"\b(?:for (?:your )?(?:publication|review|approval)"
     r"|ready (?:for|to) (?:publication|publish|review|release|ship|post)"
     r"|please (?:publish|post|review|deploy|ship|release)"
-    r"|to be published)\b", re.I)
+    r"|to be published"
+    # "Here is Chapter 12 of ..." with no word about publishing: the numbered piece is the
+    # message body. Only numbered parts: a bare "here is" would swallow "here is the
+    # release I deployed", a real claim.
+    r"|here(?:'s|\u2019s| is) (?:chapter|part|episode) \d+)\b", re.I)
 
 
 def is_handover(message: Event) -> bool:

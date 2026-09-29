@@ -14,7 +14,7 @@
     },
     {
       "path": "DESIGN.md",
-      "sha256": "77d25ca60ba5241d86dc9e878814a5726075d1dd54d1e7824567d6249ddebf49",
+      "sha256": "1ed811e5f59328d3edaf68aa05a9ae4c5e32e8b354b62cbc43ddf4e5ff00fd50",
       "rule": "exact-file",
       "keys": [
         "DESIGN.md"
@@ -81,7 +81,7 @@
     },
     {
       "path": "samples/probes/handover-probe.jsonl",
-      "sha256": "e55952f6db7c5150cfba9ed26bb71755b8469367414199606d91c883f2a872a8",
+      "sha256": "58bdb49343aef2dbfa89baab34dcecca581a402488e60bb6ed0af0256f9c5466",
       "rule": "dir-code-ext",
       "keys": [
         "samples/",
@@ -180,7 +180,7 @@
     },
     {
       "path": "src/saidvsdid/rules.py",
-      "sha256": "63777c98c99666aeedb7460326087ee45b5d427262a5390c024c9467e911cada",
+      "sha256": "bbe6b3d1b11cd4e917a8d1aa658c1c34e55d953f3d394961c4f9d779b7e7813c",
       "rule": "dir-code-ext",
       "keys": [
         "src/",
@@ -216,7 +216,7 @@
     },
     {
       "path": "tests/test_handover.py",
-      "sha256": "afa034493815ac949c36c42ab4e4834bee5bc51c6350d21c27e3fd9123e1ecc1",
+      "sha256": "d0cd1ed55fb3392b4972d2eb38617056741dbd45073efdc2e19b4d51d4ad272c",
       "rule": "dir-code-ext",
       "keys": [
         "tests/",

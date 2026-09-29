@@ -3,3 +3,4 @@
 {"id": "h-003", "t": "2026-09-27T12:02:00Z", "agent": "writer", "kind": "message", "text": "@editor Here is the release note for v2.4, ready to ship whenever you are."}
 {"id": "h-004", "t": "2026-09-27T12:03:00Z", "agent": "editor", "kind": "message", "text": "Chapter 11 is published and live on the site (commit a1b2c3d)."}
 {"id": "h-005", "t": "2026-09-27T12:04:00Z", "agent": "editor", "kind": "message", "text": "I deployed the v2.3 release note to the docs site."}
+{"id": "h-006", "t": "2026-09-27T12:05:00Z", "agent": "writer", "kind": "message", "text": "@editor Here is Chapter 14 of the guide, titled \"The Crossing\"."}

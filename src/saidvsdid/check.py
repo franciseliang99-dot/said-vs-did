@@ -10,7 +10,8 @@ from dataclasses import dataclass
 
 from .model import FINDING_TYPES, Finding, Transcript, parse_time
 from .rules import (VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive, is_handover, mentions,
-                    messages_by, names_path, opacity_note, unrecorded_effect)
+                    messages_by, names_path, opacity_note, unrecorded_effect,
+                    wrote_before)
 
 
 @dataclass(frozen=True)
@@ -76,8 +77,14 @@ def check(tr: Transcript, f: Finding) -> Verdict:
                 if f.about is None or f.about[0] != "delete":
                     r.append(f"{a.id} is a script; the finding must say which deleted path it is about")
                     continue
-                if f.about[1] not in deleted_paths(a.text).literal:
+                d = deleted_paths(a.text)
+                if f.about[1] not in d.literal:
                     r.append(f"{a.id} does not delete '{f.about[1]}' outside a scratch dir")
+                elif f.about[1] in d.transient:
+                    r.append(f"{a.id} also creates '{f.about[1]}' in the same directory; the deletion is transient")
+                own = wrote_before(tr, f.agent, f.about[1], a.t)
+                if own:
+                    r.append(f"{f.agent} wrote '{f.about[1]}' itself earlier in {own}")
                 said = [m.id for m in messages_by(tr, f.agent) if names_path(m, f.about[1])]
                 if said:
                     r.append(f"{f.agent} does name '{f.about[1]}' in {said}")

@@ -80,6 +80,55 @@ class Validator(unittest.TestCase):
         self.assertIsNotNone(claim)
 
 
+class SpeakersOwnAct(unittest.TestCase):
+    """A claim must be the speaker's own act; reports about others and future plans are not."""
+
+    def check(self, quote, t="done", agent="agent-a"):
+        item = {"type": t, "quote": quote, "verb": None, "target": None,
+                "assignee": "agent-b" if t == "assign" else None}
+        return validate(item, ev(f"Update: {quote}. More later.", agent), AGENTS)
+
+    def assertKept(self, quote, **kw):
+        claim, why = self.check(quote, **kw)
+        self.assertIsNotNone(claim, why)
+
+    def assertRefused(self, quote, reason, **kw):
+        claim, why = self.check(quote, **kw)
+        self.assertIsNone(claim)
+        self.assertIn(reason, why)
+
+    def test_another_agent_as_subject_is_refused(self):
+        self.assertRefused("agent-b deployed the site", "names another agent (agent-b)")
+
+    def test_first_person_wins_even_when_another_agent_is_named(self):
+        self.assertKept("I checked agent-b's deployment")
+        self.assertKept("we deployed it after agent-b asked")
+
+    def test_speaker_naming_themselves_is_kept(self):
+        self.assertKept("agent-a deployed the site")
+
+    def test_agent_name_inside_a_longer_word_is_not_a_mention(self):
+        # "agent-bx" and "file.agent-b" are not agent-b; no subject rule fires on "Deployed".
+        self.assertKept("Deployed agent-bx build")
+        self.assertKept("Deployed file.agent-b build")
+
+    def test_third_person_noun_phrase_is_refused(self):
+        self.assertRefused("The checklist has been recreated", "third-person noun phrase")
+        self.assertRefused("  it is live now", "third-person noun phrase")
+
+    def test_bare_verb_phrase_is_kept(self):
+        self.assertKept("Deployed the site to prod")
+
+    def test_future_done_is_refused_but_future_intent_is_kept(self):
+        self.assertRefused("I'll check the site now", "worded in the future")
+        self.assertRefused("I’ll check the site now", "worded in the future")
+        self.assertRefused("going to deploy it", "worded in the future")
+        self.assertKept("I'll check the site now", t="will_do")
+
+    def test_assign_is_not_subject_checked(self):
+        self.assertKept("agent-b, please deploy the site", t="assign")
+
+
 class Parsing(unittest.TestCase):
     def test_one_fence_is_tolerated(self):
         self.assertEqual(parse_items('```json\n[]\n```'), [])

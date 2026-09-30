@@ -333,5 +333,66 @@ class DoneNotSaid(unittest.TestCase):
         self.assertFalse(verdict(("delete", "old-reports")).reasons)
 
 
+class Transient(unittest.TestCase):
+    """A path the same script also creates is housekeeping, not a hidden deletion."""
+    CASES = [
+        # (script, transient paths)
+        ("rm -rf shop\nglab repo clone team/site/shop", ("shop",)),
+        ("rm -rf s && mkdir -p s && cd s && git init", ("s",)),
+        ("rm -rf c\ngit clone --depth 1 https://gitlab.com/g/r.git c", ("c",)),
+        ("rm -rf r\ngit clone -b main https://gitlab.com/g/r.git", ("r",)),
+        ("rm -rf x; gh repo clone o/y x -- --depth 1", ("x",)),
+        ("cat > add.py << 'EOF'\nprint(1)\nEOF\npython3 add.py\nrm add.py", ("add.py",)),
+        ("printf x > a.tmp && mv a.tmp a && rm -f a.tmp", ("a.tmp",)),
+        ("touch lock; rm lock", ("lock",)),
+        ("echo hi | tee out.txt; rm out.txt", ("out.txt",)),
+        # Not transient: nothing recreates it, a cd separates the two, or a different path is made.
+        ("rm -rf site", ()),
+        ("rm -rf s && cd w && mkdir s", ()),
+        ("rm -rf s\ngit clone https://gitlab.com/g/other.git", ()),
+        ("mkdir s; cd w; rm -rf s", ()),
+        ("rm -rf s; echo s > log", ()),
+        ("rm a >> a 2>&1; rm b", ("a",)),  # a redirect target is created, even on the rm line
+        ("(mkdir s); rm -rf s", ("s",)),  # a subshell without cd creates in the same directory
+        ("(cd w && mkdir s); rm -rf s", ()),  # the subshell's cd does not leak: s was made in w
+        ("cat a > $D; rm -rf $D", ()),
+    ]
+
+    def test_cases(self):
+        for script, want in self.CASES:
+            with self.subTest(script=script):
+                self.assertEqual(deleted_paths(script).transient, want)
+
+    def test_transient_path_still_satisfies_a_delete_claim(self):
+        # "I cleared the old clone" is still true: only done_not_said skips it.
+        a = ev(1, "a", "action", "rm -rf c && git clone u c", "command")
+        self.assertTrue(action_matches(a, "a", "delete", "c"))
+
+
+class OwnFiles(unittest.TestCase):
+    def setUp(self):
+        self.tr = Transcript([
+            ev(0, "a", "action", "cat > chapter_7.txt << 'EOF'\ntext\nEOF", "command"),
+            ev(1, "a", "action", "rm chapter_7.txt", "command"),
+            ev(2, "b", "action", "rm chapter_8.txt", "command"),
+            ev(3, "b", "action", "echo x > chapter_8.txt", "command"),       # written after: not before
+            ev(4, "a", "action", "rm -rf clone && git clone u clone", "command"),
+            ev(5, "c", "action", "echo x > shared.txt", "command"),
+            ev(6, "a", "action", "rm shared.txt", "command"),                # someone else's file
+        ])
+        self.findings, _ = propose(self.tr, [])
+
+    def test_only_deletions_of_what_others_made_or_nobody_recorded_remain(self):
+        self.assertEqual(sorted((f.agent, f.about[1]) for f in self.findings),
+                         [("a", "shared.txt"), ("b", "chapter_8.txt")])
+        self.assertTrue(all(check(self.tr, f).accepted for f in self.findings))
+
+    def test_checker_rejects_forged_findings_on_housekeeping(self):
+        def verdict(path, cite):
+            return check(self.tr, Finding("done_not_said", "a", (Cite(cite, path),), "x", about=("delete", path)))
+        self.assertIn("wrote 'chapter_7.txt' itself earlier in ['e0']", verdict("chapter_7.txt", "e1").reasons[0])
+        self.assertIn("also creates 'clone'", verdict("clone", "e4").reasons[0])
+
+
 if __name__ == "__main__":
     unittest.main()

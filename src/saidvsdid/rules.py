@@ -227,6 +227,8 @@ class Deletions:
     scratch: tuple[str, ...] = ()       # paths deleted inside a scratch dir (not consequential)
     nonliteral: int = 0                 # deletions whose path set is not literal: variable, glob,
                                         # stdin, or a find filter
+    transient: tuple[str, ...] = ()     # literal paths the same script also creates, before or after
+                                        # the deletion (a temp file, a workspace reset before a clone)
 
 
 def _resolve(cwd: str | None, path: str) -> str | None:
@@ -257,23 +259,90 @@ def _strip_prefixes(words: list[str]) -> list[str]:
     return words
 
 
+# Options of the commands in _created_paths that take the next word as their value.
+_MKDIR_ARGS = frozenset({"-m", "--mode", "--context"})
+_CLONE_ARGS = frozenset({"-b", "--branch", "-o", "--origin", "-c", "--config", "--depth", "--reference",
+                         "--template", "-u", "--upload-pack", "--separate-git-dir", "--filter", "-j", "--jobs",
+                         "--shallow-since", "--shallow-exclude"})
+_REPO_CLONE_ARGS = frozenset({"-g", "--group"})
+
+
+def _operands(args: list[str], takes_arg: frozenset[str]) -> list[str]:
+    out, opts_done, k = [], False, 0
+    while k < len(args):
+        a = args[k]
+        k += 1
+        if not opts_done and a == "--":
+            opts_done = True
+        elif not opts_done and a.startswith("-") and a != "-":
+            if a in takes_arg:
+                k += 1
+        else:
+            out.append(a)
+    return out
+
+
+def _repo_dir(url: str) -> str:
+    """The directory `git clone <url>` makes when none is given: the last path part, minus .git."""
+    name = posixpath.basename(url.rstrip("/").rsplit(":", 1)[-1])
+    return name[:-4] if name.endswith(".git") else name
+
+
+def _created_paths(cmd: str, args: list[str]) -> list[str]:
+    """Paths a command makes: mkdir, touch, git clone / init, gh / glab repo clone, tee, cp / mv /
+    install destinations. Redirect targets are added by the caller."""
+    if cmd in ("mkdir", "touch"):
+        return _operands(args, _MKDIR_ARGS)
+    if cmd == "tee":
+        return _operands(args, frozenset())
+    if cmd in ("cp", "mv", "install"):
+        return _copy_destinations(cmd, args)
+    if cmd == "git" and args[:1] == ["clone"]:
+        ops = _operands(args[1:], _CLONE_ARGS)
+        return [ops[1]] if len(ops) >= 2 else [_repo_dir(ops[0])] if ops else []
+    if cmd == "git" and args[:1] == ["init"]:
+        return _operands(args[1:], frozenset({"-b", "--initial-branch", "--template", "--separate-git-dir"}))[:1]
+    if cmd in ("gh", "glab") and args[:2] == ["repo", "clone"]:
+        rest = args[2:]
+        rest = rest[:rest.index("--")] if "--" in rest else rest  # after "--": flags for git itself
+        ops = _operands(rest, _REPO_CLONE_ARGS)
+        return [ops[1]] if len(ops) >= 2 else [_repo_dir(ops[0])] if ops else []
+    return []
+
+
 def deleted_paths(script: str) -> Deletions:
     """What a literal shell script deletes, found by parsing it: heredoc bodies, comments and
     quoted strings are never read as commands. `cd <literal path>` is followed (and scoped to
-    its subshell) so that relative deletions under a scratch dir count as scratch."""
+    its subshell) so that relative deletions under a scratch dir count as scratch.
+
+    A literal path the same script also creates, in the same directory, is transient: a helper
+    file written, run and removed, or `rm -rf clone && git clone ... clone`. Paths are compared as
+    written between two `cd`s, so a `cd` in between makes them different paths."""
     try:
         toks = _lex(script)
     except _Unparsed:
         return Deletions(parsed=False)
     literal: dict[str, str] = {}   # normalized -> as first written
+    literal_at: dict[str, set[int]] = {}  # normalized -> directory epochs it was deleted in
+    created: set[tuple[int, str]] = set()
     scratch: dict[str, str] = {}
     nonliteral = 0
     cwd: str | None = None
-    stack: list[str | None] = []
+    epoch, epochs = 0, 0            # a new epoch per cd: relative paths mean something else after it
+    stack: list[tuple[str | None, int]] = []
     words: list[str] = []
 
-    def run(words: list[str]) -> None:
-        nonlocal cwd, nonliteral
+    def run(raw: list[str]) -> None:
+        nonlocal cwd, nonliteral, epoch, epochs
+        words: list[str] = []
+        for k, w in enumerate(raw):
+            if w.startswith("\0redirect"):
+                continue
+            if k and raw[k - 1].startswith("\0redirect"):
+                if raw[k - 1][len("\0redirect"):] in _WRITE_REDIRECTS and not _NONLITERAL.search(w):
+                    created.add((epoch, norm_target(w)))
+                continue
+            words.append(w)
         words = _strip_prefixes(words)
         if not words:
             return
@@ -281,7 +350,12 @@ def deleted_paths(script: str) -> Deletions:
         if cmd == "cd":
             target = next((a for a in args if not a.startswith("-")), None)
             cwd = _resolve(cwd, target) if target and not _NONLITERAL.search(target) else None
+            epochs += 1
+            epoch = epochs
             return
+        for p in _created_paths(cmd, args):
+            if p and not _NONLITERAL.search(p):
+                created.add((epoch, norm_target(p)))
         if cmd == "git" and args[:1] == ["rm"]:
             cmd, args = "rm", args[1:]
         if cmd == "xargs" and any(posixpath.basename(a) in DELETE_COMMANDS for a in args):
@@ -316,23 +390,28 @@ def deleted_paths(script: str) -> Deletions:
             if _NONLITERAL.search(op):
                 nonliteral += 1
                 continue
-            bucket = scratch if _in_scratch(_resolve(cwd, op)) else literal
-            bucket.setdefault(norm_target(op), op)
+            if _in_scratch(_resolve(cwd, op)):
+                scratch.setdefault(norm_target(op), op)
+            else:
+                literal.setdefault(norm_target(op), op)
+                literal_at.setdefault(norm_target(op), set()).add(epoch)
 
     for kind, val in toks + [("op", "\n")]:
         if kind == "w":
             words.append(val)
             continue
         if val in _REDIRECTS:
-            words.append("\0redirect")  # the next word is its target, not an argument
+            words.append("\0redirect" + val)  # the next word is its target, not an argument
             continue
-        run([w for k, w in enumerate(words) if w != "\0redirect" and (k == 0 or words[k - 1] != "\0redirect")])
+        run(words)
         words = []
         if val == "(":
-            stack.append(cwd)
+            stack.append((cwd, epoch))
         elif val == ")" and stack:
-            cwd = stack.pop()
-    return Deletions(True, tuple(literal.values()), tuple(scratch.values()), nonliteral)
+            cwd, epoch = stack.pop()
+    # Transient only if every deletion of the path was in a directory epoch where it is also created.
+    transient = tuple(p for key, p in literal.items() if all((e, key) in created for e in literal_at[key]))
+    return Deletions(True, tuple(literal.values()), tuple(scratch.values()), nonliteral, transient)
 
 
 # --- what a literal script writes ------------------------------------------------------
@@ -520,6 +599,22 @@ def names_path(message: Event, path: str) -> bool:
     names = {p, posixpath.basename(p)} if len(posixpath.basename(p)) >= 3 else {p}
     text = message.text.lower()
     return any(re.search(r"(?<![\w./-])" + re.escape(n) + r"(?![\w-]|/\.?[\w-]|\.\w)", text) for n in names if n)
+
+
+def wrote_before(tr: Transcript, agent: str, path: str, before: datetime) -> list[str]:
+    """Earlier actions in which this agent itself wrote `path` (a script redirect / copy / tee, or a
+    file_write). Deleting a file you made is housekeeping of your own work, not a hidden act."""
+    key = norm_target(path)
+    hits = []
+    for e in tr.events:
+        if e.kind != "action" or e.agent != agent or e.t >= before:
+            continue
+        if e.tool == "command":
+            if key in {norm_target(p) for p in written_paths(e.text).literal}:
+                hits.append(e.id)
+        elif e.tool == "file_write" and e.target and norm_target(e.target) == key:
+            hits.append(e.id)
+    return hits
 
 
 def actions_in(tr: Transcript, agent: str, start: datetime, end: datetime) -> list[Event]:

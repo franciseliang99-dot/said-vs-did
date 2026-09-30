@@ -13,14 +13,17 @@ from .check import check
 from .graph import build_graph, graph_to_json, render_graph
 from .extract import Extraction, backend_from_spec, claim_to_json, extract
 from .match import propose
-from .model import InputError, finding_to_json, load_claims, load_events, load_findings
+from .model import InputError, finding_to_json, load_claims, load_events, load_findings, parse_time
 
 
-def render(verdicts, unchecked, events_path: str, ex: Extraction | None = None, graph_lines=None) -> str:
+def render(verdicts, unchecked, events_path: str, ex: Extraction | None = None, graph_lines=None,
+           report_from: str | None = None) -> str:
     acc = [v for v in verdicts if v.accepted]
     rej = [v for v in verdicts if not v.accepted]
-    out = [f"# Said vs Did — {events_path}", "",
-           f"{len(acc)} accepted · {len(rej)} rejected · {len(unchecked)} not checked", ""]
+    out = [f"# Said vs Did — {events_path}", ""]
+    if report_from:
+        out += [f"Reporting from {report_from}; earlier events are lookback, searched but not reported.", ""]
+    out += [f"{len(acc)} accepted · {len(rej)} rejected · {len(unchecked)} not checked", ""]
     if graph_lines:
         out += graph_lines + [""]
     out.append("## Findings")
@@ -66,6 +69,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true", help="print machine-readable verdicts")
     ap.add_argument("--graph", action="store_true",
                     help="print only the interaction graph (who addresses whom); needs no claims")
+    ap.add_argument("--report-from", metavar="TIME",
+                    help="ISO time; events before it are lookback: the checker searches them, but their "
+                         "messages are not extracted, findings anchored on them are not reported, and they "
+                         "are left out of the graph")
     a = ap.parse_args(argv)
     if a.graph and (a.claims or a.extract or a.findings or a.save_claims):
         ap.error("--graph takes only the events file")
@@ -73,9 +80,18 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("give --claims, --extract, --findings, or a claims source plus --findings")
     if a.save_claims and not a.extract:
         ap.error("--save-claims needs --extract")
+    if a.report_from and (a.graph or a.findings):
+        ap.error("--report-from works with --claims or --extract only")
 
     try:
         tr = load_events(Path(a.events))
+        since = None
+        if a.report_from:
+            since = parse_time(a.report_from)
+            if since.tzinfo is None:
+                raise ValueError(f"--report-from {a.report_from!r} has no time zone")
+            if since > tr.end:
+                raise ValueError(f"--report-from {a.report_from} is after the last event ({tr.end.isoformat()})")
         if a.graph:
             g = build_graph(tr)
             if a.json:
@@ -86,12 +102,20 @@ def main(argv: list[str] | None = None) -> int:
         ex = None
         claims = load_claims(Path(a.claims)) if a.claims else []
         if a.extract:
-            ex = extract(tr, backend_from_spec(a.extract))
+            ex = extract(tr, backend_from_spec(a.extract), since)
             claims = ex.claims
             if a.save_claims:
                 Path(a.save_claims).write_text("".join(json.dumps(claim_to_json(c), ensure_ascii=False) + "\n"
                                                        for c in claims), encoding="utf-8")
         proposed, unchecked = propose(tr, claims) if (a.claims or a.extract) else ([], [])
+        if since is not None:
+            # Keep what is anchored at or after the report start: a finding's first cite is its claim
+            # message or its action. An unknown event id stays, so the report still shows it.
+            def reported(event_id: str) -> bool:
+                ev = tr.by_id.get(event_id)
+                return ev is None or ev.t >= since
+            proposed = [f for f in proposed if reported(f.cites[0].event)]
+            unchecked = [u for u in unchecked if reported(u.event)]
         given = load_findings(Path(a.findings)) if a.findings else []
     except (InputError, OSError, ValueError, RuntimeError) as exc:
         print(f"saidvsdid: input error: {exc}", file=sys.stderr)
@@ -106,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps([{"finding": finding_to_json(v.finding), "accepted": v.accepted,
                            "reasons": list(v.reasons)} for v in verdicts], indent=2))
     else:
-        sys.stdout.write(render(verdicts, unchecked, a.events, ex, render_graph(build_graph(tr))))
+        sys.stdout.write(render(verdicts, unchecked, a.events, ex, render_graph(build_graph(tr, since)), a.report_from))
 
     bad = [v for v in own if not v.accepted]
     if bad:

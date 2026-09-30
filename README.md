@@ -41,6 +41,14 @@ the full edge list.
 (needs `ANTHROPIC_API_KEY`). One call per message. `--save-claims <file>` writes the
 claims that survived validation, in the same format `--claims` reads.
 
+`--report-from TIME` (ISO, with a time zone) is for a slice of a longer run. Convert the
+slice with some lookback before it (a day is enough on the Village data), then pass the
+slice start here. The checker searches the lookback, so a claim made just after the start
+is judged against the actions before it; the report (findings, unchecked items and the
+graph) covers only what happens from `TIME` on, and `--extract` sends only those messages
+to the model. Without lookback, a claim made a minute into a slice is judged against an
+empty past and looks unbacked.
+
 `--findings <file>` checks someone else's findings (for example, a model's) instead of
 proposing its own. `--json` prints machine-readable verdicts.
 
@@ -78,7 +86,14 @@ findings and three planted true statements that must not be flagged.
   if its quote is not verbatim, its type or verb is out of range, its assignee is
   unknown or the speaker, or its target does not appear inside the quote. That last rule
   is strict on purpose: a target the message never says is a guess, so "the deploy
-  script" cannot become `deploy.sh`. The cost is that such claims are not checked.
+  script" cannot become `deploy.sh`. A `done`, `doing` or `will_do` claim is also
+  refused if it is not the speaker's own act: a quote with no first-person word whose
+  subject is another agent or a noun phrase ("GPT-5 deployed the site", "The checklist
+  has been recreated") is a status report, and a `done` worded in the future ("I'll
+  check the site now") is not done. The cost is that such claims are not checked.
+  On one real day this refused about a quarter of the model's claims; among them are a
+  few passive-voice statements of the speaker's own work, which go unchecked rather
+  than cleared or accused.
   Whatever survives still has to pass the checker.
 - **The checker is not independent of the matcher.** They share one matching predicate,
   so the checker fully gates proposed findings but would not catch a bug in that

@@ -8,6 +8,7 @@ its sender and never turned into edges (guessing who a broadcast was for is inve
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from .model import Transcript
 
@@ -27,12 +28,15 @@ class Graph:
     only_addressed: tuple[str, ...]              # named in some `to` but produced no event
 
 
-def build_graph(tr: Transcript) -> Graph:
+def build_graph(tr: Transcript, since: datetime | None = None) -> Graph:
+    """With `since`, events before it (lookback) are left out, so the graph covers what the report covers."""
     agents: list[str] = []
     ids: dict[tuple[str, str], list[str]] = {}
     broadcasts: dict[str, list[str]] = {}
     named: list[str] = []
     for e in tr.events:
+        if since is not None and e.t < since:
+            continue
         if e.agent not in agents:
             agents.append(e.agent)
         if e.kind != "message":

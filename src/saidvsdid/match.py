@@ -7,7 +7,8 @@ from datetime import timezone
 
 from .model import Cite, Claim, Event, Finding, Transcript
 from .rules import (DELETE_HINT, VERB_TOOLS, action_matches, actions_in, deleted_paths, is_destructive,
-                    is_handover, mentions, messages_by, names_path, opacity_note, unrecorded_effect)
+                    is_handover, mentions, messages_by, names_path, opacity_note, unrecorded_effect,
+                    wrote_before)
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,9 @@ def _script_deletions(tr: Transcript, a: Event, findings: list[Finding], uncheck
         unchecked.append(Unchecked(a.id, f"{d.nonliteral} deletion(s) of a non-literal path (variable, glob, stdin or find filter)"))
     msgs = messages_by(tr, a.agent)
     for path in dict.fromkeys(d.literal):
+        # Recreated in the same script, or a file the agent wrote itself: housekeeping, not a hidden act.
+        if path in d.transient or wrote_before(tr, a.agent, path, a.t):
+            continue
         if not any(names_path(m, path) for m in msgs):
             findings.append(Finding(
                 "done_not_said", a.agent, (Cite(a.id, path if path in a.text else a.text),),

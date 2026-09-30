@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Callable
 
 from .model import CLAIM_TYPES, Claim, Event, Transcript
@@ -55,6 +57,30 @@ def parse_items(raw: str) -> list:
     return items
 
 
+_FIRST_PERSON = re.compile(r"\b(?:I|I'm|I've|I'll|I'd|I’m|I’ve|I’ll|I’d|me|my|we|we're|we've|we'll|"
+                           r"we’re|we’ve|we’ll|us)\b", re.IGNORECASE)
+_THIRD_PERSON_START = re.compile(r"^\W*(?:the|this|that|these|those|it|its|there|they|their|he|she|his|her|"
+                                 r"a|an)\b", re.IGNORECASE)
+_FUTURE = re.compile(r"\b(?:will|I'll|I’ll|we'll|we’ll|going to|about to)\b", re.IGNORECASE)
+
+
+def _not_the_speakers_act(t: str, quote: str, speaker: str, agents: list[str]) -> str:
+    """A small model reads a status report ("Claude X has completed the checklist") as the speaker's
+    own done claim, and the matcher then finds no action by the speaker. On a 1191-message day that
+    produced 23 of 24 findings. A claim without a first-person word whose subject is another agent or
+    a third-person noun phrase is not the speaker's; a done claim worded in the future is not done."""
+    if t == "done" and _FUTURE.search(quote):
+        return "done claim is worded in the future"
+    if _FIRST_PERSON.search(quote):
+        return ""
+    for name in agents:
+        if name != speaker and re.search(rf"(?<![\w.]){re.escape(name)}(?!\w)", quote):
+            return f"quote names another agent ({name}) and not the speaker"
+    if _THIRD_PERSON_START.search(quote):
+        return "quote's subject is a third-person noun phrase, not the speaker"
+    return ""
+
+
 def validate(item, ev: Event, agents: list[str]) -> tuple[Claim | None, str]:
     if not isinstance(item, dict):
         return None, "item is not an object"
@@ -78,6 +104,10 @@ def validate(item, ev: Event, agents: list[str]) -> tuple[Claim | None, str]:
         # wrong object. Neither reaches the matcher.
         if norm_target(target) not in quote.lower():
             return None, f"target {target!r} does not appear in the quote"
+    if t != "assign":
+        why = _not_the_speakers_act(t, quote, ev.agent, agents)
+        if why:
+            return None, why
     if t == "assign":
         if assignee not in agents:
             return None, f"assignee {assignee!r} is not a known agent"
@@ -88,11 +118,12 @@ def validate(item, ev: Event, agents: list[str]) -> tuple[Claim | None, str]:
     return Claim(ev.id, ev.agent, t, quote, verb, target, assignee), ""
 
 
-def extract(tr: Transcript, backend: Backend) -> Extraction:
+def extract(tr: Transcript, backend: Backend, since: datetime | None = None) -> Extraction:
+    """Messages before ``since`` are lookback: not extracted, but still visible to the checker."""
     agents = sorted({e.agent for e in tr.events})
     out = Extraction()
     for ev in tr.events:
-        if ev.kind != "message":
+        if ev.kind != "message" or (since is not None and ev.t < since):
             continue
         out.messages += 1
         try:
